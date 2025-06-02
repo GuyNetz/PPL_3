@@ -213,8 +213,19 @@ export const typeofLetrec = (exp: LetrecExp, tenv: TEnv): Result<TExp> => {
 //   (define (var : texp) val)
 // TODO - write the true definition
 export const typeofDefine = (exp: DefineExp, tenv: TEnv): Result<VoidTExp> => {
-    // return Error("TODO");
-    return makeOk(makeVoidTExp());
+    // 1. Get the declared type from the variable declaration.
+    const declaredType: TExp = exp.var.texp; 
+    // 2. Compute the type of the assigned value (exp.val).
+    const valueTypeResult: Result<TExp> = typeofExp(exp.val, tenv);
+
+    // 3. Check if the computed type of the value matches the declared type.
+    return bind(valueTypeResult, (valueType: TExp) => {
+        const typeMatchResult: Result<true> = checkEqualType(valueType, declaredType, exp); 
+        return bind(typeMatchResult, (_: true) => {           
+            // If we reach here, types match, return VoidTExp 
+            return makeOk(makeVoidTExp()); 
+        });
+    });
 };
 
 // Purpose: compute the type of a program
