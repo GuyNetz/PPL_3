@@ -4,13 +4,13 @@ import { equals, map, zipWith } from 'ramda';
 import { isAppExp, isBoolExp, isDefineExp, isIfExp, isLetrecExp, isLetExp, isNumExp,
          isPrimOp, isProcExp, isProgram, isStrExp, isVarRef, parseL5Exp, unparse,
          AppExp, BoolExp, DefineExp, Exp, IfExp, LetrecExp, LetExp, NumExp,
-         Parsed, PrimOp, ProcExp, Program, StrExp } from "./L5-ast";
+         Parsed, PrimOp, ProcExp, Program, StrExp, isCExp, parseL5Program, parseL5} from "./L5-ast";
 import { applyTEnv, makeEmptyTEnv, makeExtendTEnv, TEnv } from "./TEnv";
 import { isProcTExp, makeBoolTExp, makeNumTExp, makeProcTExp, makeStrTExp, makeVoidTExp,
          parseTE, unparseTExp,
          BoolTExp, NumTExp, StrTExp, TExp, VoidTExp } from "./TExp";
 import { isEmpty, allT, first, rest, NonEmptyList, List, isNonEmptyList } from '../shared/list';
-import { Result, makeFailure, bind, makeOk, zipWithResult } from '../shared/result';
+import { Result, makeFailure, bind, makeOk, zipWithResult, isFailure } from '../shared/result';
 import { parse as p } from "../shared/parser";
 import { format } from '../shared/format';
 
@@ -231,5 +231,77 @@ export const typeofDefine = (exp: DefineExp, tenv: TEnv): Result<VoidTExp> => {
 // Purpose: compute the type of a program
 // Typing rule:
 // TODO - write the true definition
-export const typeofProgram = (exp: Program, tenv: TEnv): Result<TExp> =>
-    makeFailure("TODO");
+export const typeofProgram = (exp: Program, tenv: TEnv): Result<TExp> => {
+    // A program must have at least one expression according to the grammar (L5 <exp>+) 
+    if (isEmpty(exp.exps)) {
+        return makeFailure("Program must contain at least one expression.");
+    }
+    // Use a helper function to sequentially process the expressions and thread the environment.
+    return typeofExpsSequential(exp.exps, tenv);
+};
+
+const typeofExpsSequential = (exps: Exp[], tenv: TEnv): Result<TExp> => {
+    // Base Case: Empty list of expressions should not happen based on typeofProgram check
+    if (isEmpty(exps)) {
+        return makeFailure("Unexpected empty list of expressions in sequence");
+    }
+
+    const firstExp = exps[0];
+    const restExps = exps.slice(1);
+
+    // If it's the last expression in the sequence, return its type. 
+    if (isEmpty(restExps)) {
+        return typeofExp(firstExp, tenv); // Compute type of the last expression 
+    }
+
+    // If it's a DefineExp, type-check the definition, extend the environment, and proceed with the rest.
+    if (isDefineExp(firstExp)) {
+        return bind(typeofDefine(firstExp, tenv), (_: VoidTExp) => {
+            // Extend the type environment with the variable name and its declared type. 
+            // This new environment will be used for the rest of the expressions.
+            const newTEnv = makeExtendTEnv([firstExp.var.var], [firstExp.var.texp], tenv);
+            // Recursively process the rest of the expressions with the new environment.
+            return typeofExpsSequential(restExps, newTEnv);
+        });
+    }
+
+    // If it's any other CExp (non-DefineExp) which is not the last expression
+    if (isCExp(firstExp)) {
+         return bind(typeofExp(firstExp, tenv), (_: TExp) => {
+            // Discard the type of the intermediate CExp (_: TExp)
+            return typeofExpsSequential(restExps, tenv); // Continue with the *same* environment
+         });
+    }
+
+    // Should not reach here if grammar is followed.
+    return makeFailure(`Unexpected expression type in program sequence: ${format(firstExp)}`);
+};
+
+export function L5programTypeof(programString: string): Result<string> {
+    // Parse the input string as an L5 program using the appropriate function.
+    const parseResult: Result<Program> = parseL5(programString);
+    // Check if parsing failed. If so, return the failure as is.
+    if (isFailure(parseResult)) {
+        return parseResult;
+    }
+    // If parsing succeeded, get the AST of type Program.
+    const programAST: Program = parseResult.value;
+
+    // Define the initial type environment for type-checking the program.
+    const initialTEnv: TEnv = makeEmptyTEnv();
+
+    // Perform type-checking on the program's AST using typeofProgram.
+    const typecheckResult: Result<TExp> = typeofProgram(programAST, initialTEnv); // typeofProgram is still 'TODO' but expected to return Result<TExp>
+
+    // Check if type-checking failed. If so, return the failure as is.
+    if (isFailure(typecheckResult)) {
+        return typecheckResult;
+    }
+
+    // If type-checking succeeded, get the program's type (of type TExp).
+    const programType: TExp = typecheckResult.value;
+
+    // Convert the program's type (TExp) to a readable string.
+    // The unparseTExp function already returns Result<string>, so we can return its result directly.
+    return unparseTExp(programType);
+}

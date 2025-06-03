@@ -1,5 +1,5 @@
 import * as assert from "assert";
-import { /*L5programTypeof,*/ L5typeof } from "../src/L5/L5-typecheck";
+import { L5programTypeof, L5typeof } from "../src/L5/L5-typecheck";
 
 // Helper function to unwrap the Result from L5typeof
 function getTypeofValue(exp: string): string | Error {
@@ -12,15 +12,15 @@ function getTypeofValue(exp: string): string | Error {
     }
 }
 
-// function getTypeofProgram(exp: string): string | Error {
-//     const result = L5programTypeof(exp);
-//     if (result.tag === 'Ok') {
-//         return result.value;
-//     } else {
-//         // Convert Failure to Error
-//         return new Error(result.message);
-//     }
-// }
+function getTypeofProgram(exp: string): string | Error {
+    const result = L5programTypeof(exp);
+    if (result.tag === 'Ok') {
+        return result.value;
+    } else {
+        // Convert Failure to Error
+        return new Error(result.message);
+    }
+}
 
 describe("L5 Type Checker", () => {
     describe("Type Definition Tests", () => {
@@ -49,61 +49,61 @@ describe("L5 Type Checker", () => {
         });
     });
 
-    // describe("Type Error Tests", () => {
-    //     it("should detect type mismatch between number and boolean", () => {
-    //         assert.deepEqual(getTypeofValue("(define (x : number) #t)") instanceof Error, true);
-    //     });
+    describe("Type Error Tests", () => {
+        it("should detect type mismatch between number and boolean", () => {
+            assert.deepEqual(getTypeofValue("(define (x : number) #t)") instanceof Error, true);
+        });
 
-    //     it("should detect type mismatch between boolean and number", () => {
-    //         assert.deepEqual(getTypeofValue("(define (x : boolean) 5)") instanceof Error, true);
-    //     });
+        it("should detect type mismatch between boolean and number", () => {
+            assert.deepEqual(getTypeofValue("(define (x : boolean) 5)") instanceof Error, true);
+        });
 
-    //     it("should detect return type mismatch in function", () => {
-    //         assert.deepEqual(getTypeofValue("(define (x : (number -> boolean)) (lambda ((x : number)) : number (+ 1 x)))") instanceof Error, true);
-    //     });
+        it("should detect return type mismatch in function", () => {
+            assert.deepEqual(getTypeofValue("(define (x : (number -> boolean)) (lambda ((x : number)) : number (+ 1 x)))") instanceof Error, true);
+        });
 
-    //     it("should detect parameter count mismatch in function", () => {
-    //         assert.deepEqual(getTypeofValue("(define (x : (number -> number)) (lambda () : number 1))") instanceof Error, true);
-    //     });
+        it("should detect parameter count mismatch in function", () => {
+            assert.deepEqual(getTypeofValue("(define (x : (number -> number)) (lambda () : number 1))") instanceof Error, true);
+        });
 
-    //     it("should detect binding type mismatch in let expression", () => {
-    //         assert.deepEqual(getTypeofValue("(define (x : number) (let (((y : number) #t)) y))") instanceof Error, true);
-    //     });
+        it("should detect binding type mismatch in let expression", () => {
+            assert.deepEqual(getTypeofValue("(define (x : number) (let (((y : number) #t)) y))") instanceof Error, true);
+        });
 
-    //     it("should detect body type mismatch with return type", () => {
-    //         assert.deepEqual(getTypeofValue("(define (x : boolean) (let (((y : number) 5)) y))") instanceof Error, true);
-    //     });
+        it("should detect body type mismatch with return type", () => {
+            assert.deepEqual(getTypeofValue("(define (x : boolean) (let (((y : number) 5)) y))") instanceof Error, true);
+        });
 
-    //     it("should detect type error in operator arguments", () => {
-    //         assert.deepEqual(getTypeofValue("(define (x : number) (let (((y : boolean) #t)) (+ y 1)))") instanceof Error, true);
-    //     });
-    // });
+        it("should detect type error in operator arguments", () => {
+            assert.deepEqual(getTypeofValue("(define (x : number) (let (((y : boolean) #t)) (+ y 1)))") instanceof Error, true);
+        });
+    });
 
-    // describe("Program Type Tests", () => {
-    //     it("should correctly type a simple program with number", () => {
-    //         assert.deepEqual(getTypeofProgram("(L5 (define (x : number) 5) (+ x 1))"), "number");
-    //     });
+    describe("Program Type Tests", () => {
+        it("should correctly type a simple program with number", () => {
+            assert.deepEqual(getTypeofProgram("(L5 (define (x : number) 5) (+ x 1))"), "number");
+        });
 
-    //     it("should correctly type a simple program with boolean", () => {
-    //         assert.deepEqual(getTypeofProgram("(L5 (define (x : boolean) #t) x)"), "boolean");
-    //     });
+        it("should correctly type a simple program with boolean", () => {
+            assert.deepEqual(getTypeofProgram("(L5 (define (x : boolean) #t) x)"), "boolean");
+        });
 
-    //     it("should correctly type a program with function application", () => {
-    //         assert.deepEqual(getTypeofProgram("(L5 (define (x : (Empty -> number)) (lambda () : number 1)) (x))"), "number");
-    //     });
+        it("should correctly type a program with function application", () => {
+            assert.deepEqual(getTypeofProgram("(L5 (define (x : (Empty -> number)) (lambda () : number 1)) (x))"), "number");
+        });
 
-    //     it("should correctly type a program with multiple definitions", () => {
-    //         assert.deepEqual(getTypeofProgram("(L5 (define (x : number) 5) (define (y : number) 6) (+ x y))"), "number");
-    //     });
+        it("should correctly type a program with multiple definitions", () => {
+            assert.deepEqual(getTypeofProgram("(L5 (define (x : number) 5) (define (y : number) 6) (+ x y))"), "number");
+        });
 
-    //     it("should correctly type a program with function definition and application", () => {
-    //         assert.deepEqual(getTypeofProgram("(L5 (define (x : (number -> number)) (lambda ((n : number)) : number (+ n 1))) (x 5))"), "number");
-    //     });
+        it("should correctly type a program with function definition and application", () => {
+            assert.deepEqual(getTypeofProgram("(L5 (define (x : (number -> number)) (lambda ((n : number)) : number (+ n 1))) (x 5))"), "number");
+        });
 
-    //     it("should correctly type a program with let expression", () => {
-    //         assert.deepEqual(getTypeofProgram("(L5 (define (x : number) (let (((y : number) 5)) (- 0 y))) (+ 7 x))"), "number");
-    //     });
-    // });
+        it("should correctly type a program with let expression", () => {
+            assert.deepEqual(getTypeofProgram("(L5 (define (x : number) (let (((y : number) 5)) (- 0 y))) (+ 7 x))"), "number");
+        });
+    });
 
     // describe("Pair Type Tests", () => {
     //     it("should correctly type a pair of number and boolean", () => {
