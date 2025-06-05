@@ -105,47 +105,47 @@ describe("L5 Type Checker", () => {
         });
     });
 
-    // describe("Pair Type Tests", () => {
-    //     it("should correctly type a pair of number and boolean", () => {
-    //         assert.deepEqual(getTypeofValue("(define (p : (Pair number boolean)) (cons 5 #t))"), "void");
-    //     });
+    describe("Pair Type Tests", () => {
+        it("should correctly type a pair of number and boolean", () => {
+            assert.deepEqual(getTypeofValue("(define (p : (Pair number boolean)) (cons 5 #t))"), "void");
+        });
 
-    //     it("should correctly type car of a pair", () => {
-    //         assert.deepEqual(getTypeofProgram("(L5 (define (p : (Pair number boolean)) (cons 5 #t)) (car p))"), "number");
-    //     });
+        it("should correctly type car of a pair", () => {
+            assert.deepEqual(getTypeofProgram("(L5 (define (p : (Pair number boolean)) (cons 5 #t)) (car p))"), "number");
+        });
 
-    //     it("should correctly type cdr of a pair", () => {
-    //         assert.deepEqual(getTypeofProgram("(L5 (define (p : (Pair number boolean)) (cons 5 #t)) (cdr p))"), "boolean");
-    //     });
+        it("should correctly type cdr of a pair", () => {
+            assert.deepEqual(getTypeofProgram("(L5 (define (p : (Pair number boolean)) (cons 5 #t)) (cdr p))"), "boolean");
+        });
 
-    //     it("should correctly type a pair with function and boolean", () => {
-    //         assert.deepEqual(getTypeofValue("(define (p : (Pair (number -> number) boolean)) (cons (lambda ((x : number)) : number (* x 2)) #t))"), "void");
-    //     });
+        it("should correctly type a pair with function and boolean", () => {
+            assert.deepEqual(getTypeofValue("(define (p : (Pair (number -> number) boolean)) (cons (lambda ((x : number)) : number (* x 2)) #t))"), "void");
+        });
 
-    //     it("should correctly type a nested pair", () => {
-    //         assert.deepEqual(getTypeofValue("(define (p : (Pair number (Pair string boolean))) (cons 5 (cons \"hello\" #t)))"), "void");
-    //     });
+        it("should correctly type a nested pair", () => {
+            assert.deepEqual(getTypeofValue("(define (p : (Pair number (Pair string boolean))) (cons 5 (cons \"hello\" #t)))"), "void");
+        });
 
-    //     it("should correctly type element access in nested pair", () => {
-    //         assert.deepEqual(getTypeofProgram("(L5 (define (p : (Pair number (Pair string boolean))) (cons 5 (cons \"hello\" #t))) (car (cdr p)))"), "string");
-    //     });
+        it("should correctly type element access in nested pair", () => {
+            assert.deepEqual(getTypeofProgram("(L5 (define (p : (Pair number (Pair string boolean))) (cons 5 (cons \"hello\" #t))) (car (cdr p)))"), "string");
+        });
 
-    //     it("should correctly type a polymorphic pair swap function", () => {
-    //         assert.deepEqual(getTypeofValue("(define (swap : ((Pair T1 T2) -> (Pair T2 T1))) (lambda ((p : (Pair T1 T2))) : (Pair T2 T1) (cons (cdr p) (car p))))"), "void");
-    //     });
+        it("should correctly type a polymorphic pair swap function", () => {
+            assert.deepEqual(getTypeofValue("(define (swap : ((Pair T1 T2) -> (Pair T2 T1))) (lambda ((p : (Pair T1 T2))) : (Pair T2 T1) (cons (cdr p) (car p))))"), "void");
+        });
 
-    //     it("should detect pair element type mismatch", () => {
-    //         assert.deepEqual(getTypeofValue("(define (p : (Pair number boolean)) (cons #t 5))") instanceof Error, true);
-    //     });
+        it("should detect pair element type mismatch", () => {
+            assert.deepEqual(getTypeofValue("(define (p : (Pair number boolean)) (cons #t 5))") instanceof Error, true);
+        });
 
-    //     it("should detect type error when using cdr result incorrectly", () => {
-    //         assert.deepEqual(getTypeofProgram("(L5 (define (p : (Pair number boolean)) (cons 5 #t)) (+ (cdr p) 1))") instanceof Error, true);
-    //     });
+        it("should detect type error when using cdr result incorrectly", () => {
+            assert.deepEqual(getTypeofProgram("(L5 (define (p : (Pair number boolean)) (cons 5 #t)) (+ (cdr p) 1))") instanceof Error, true);
+        });
 
-    //     it("should detect type error when using car result incorrectly", () => {
-    //         assert.deepEqual(getTypeofProgram("(L5 (define (p : (Pair number boolean)) (cons 5 #t)) (if (car p) #t #f))") instanceof Error, true);
-    //     });
-    // });
+        it("should detect type error when using car result incorrectly", () => {
+            assert.deepEqual(getTypeofProgram("(L5 (define (p : (Pair number boolean)) (cons 5 #t)) (if (car p) #t #f))") instanceof Error, true);
+        });
+    });
 
     // describe("Quote Expression Tests", () => {
 

@@ -8,7 +8,7 @@ import { isAppExp, isBoolExp, isDefineExp, isIfExp, isLetrecExp, isLetExp, isNum
 import { applyTEnv, makeEmptyTEnv, makeExtendTEnv, TEnv } from "./TEnv";
 import { isProcTExp, makeBoolTExp, makeNumTExp, makeProcTExp, makeStrTExp, makeVoidTExp,
          parseTE, unparseTExp,
-         BoolTExp, NumTExp, StrTExp, TExp, VoidTExp } from "./TExp";
+         BoolTExp, NumTExp, StrTExp, TExp, VoidTExp, TVar, makeFreshTVar, makePairTExp, matchTVarsInTEs } from "./TExp";
 import { isEmpty, allT, first, rest, NonEmptyList, List, isNonEmptyList } from '../shared/list';
 import { Result, makeFailure, bind, makeOk, zipWithResult, isFailure } from '../shared/result';
 import { parse as p } from "../shared/parser";
@@ -19,11 +19,18 @@ import { format } from '../shared/format';
 // Return an error if the types are different - true otherwise.
 // Exp is only passed for documentation purposes.
 const checkEqualType = (te1: TExp, te2: TExp, exp: Exp): Result<true> =>
-  equals(te1, te2) ? makeOk(true) :
-  bind(unparseTExp(te1), (te1: string) =>
-    bind(unparseTExp(te2), (te2: string) =>
-        bind(unparse(exp), (exp: string) => 
-            makeFailure<true>(`Incompatible types: ${te1} and ${te2} in ${exp}`))));
+  // If the types are equal, return true
+  matchTVarsInTEs(
+    [te1], 
+    [te2],
+    // success: if the types are equal, we return true
+    (_mapping) => makeOk(true),
+    // fail: if the types are not equal, we return a failure
+    () => bind(unparseTExp(te1), (s1: string) =>
+               bind(unparseTExp(te2), (s2: string) =>
+               bind(unparse(exp), (es: string) =>
+                   makeFailure<true>(`Incompatible types: ${s1} and ${s2} in ${es}`))))
+  );
 
 // Compute the type of L5 AST exps to TE
 // ===============================================
@@ -80,29 +87,65 @@ const numCompTExp = parseTE('(number * number -> boolean)');
 const boolOpTExp = parseTE('(boolean * boolean -> boolean)');
 
 // Todo: cons, car, cdr, list
-export const typeofPrim = (p: PrimOp): Result<TExp> =>
-    (p.op === '+') ? numOpTExp :
-    (p.op === '-') ? numOpTExp :
-    (p.op === '*') ? numOpTExp :
-    (p.op === '/') ? numOpTExp :
-    (p.op === 'and') ? boolOpTExp :
-    (p.op === 'or') ? boolOpTExp :
-    (p.op === '>') ? numCompTExp :
-    (p.op === '<') ? numCompTExp :
-    (p.op === '=') ? numCompTExp :
+export const typeofPrim = (p: PrimOp): Result<TExp> => {
+    if (p.op === '+') return numOpTExp;
+    if (p.op === '-') return numOpTExp;
+    if (p.op === '*') return numOpTExp;
+    if (p.op === '/') return numOpTExp;
+    if (p.op === 'and') return boolOpTExp;
+    if (p.op === 'or') return boolOpTExp;
+    if (p.op === '>') return numCompTExp;
+    if (p.op === '<') return numCompTExp;
+    if (p.op === '=') return numCompTExp;
     // Important to use a different signature for each op with a TVar to avoid capture
-    (p.op === 'number?') ? parseTE('(T -> boolean)') :
-    (p.op === 'boolean?') ? parseTE('(T -> boolean)') :
-    (p.op === 'string?') ? parseTE('(T -> boolean)') :
-    (p.op === 'list?') ? parseTE('(T -> boolean)') :
-    (p.op === 'pair?') ? parseTE('(T -> boolean)') :
-    (p.op === 'symbol?') ? parseTE('(T -> boolean)') :
-    (p.op === 'not') ? parseTE('(boolean -> boolean)') :
-    (p.op === 'eq?') ? parseTE('(T1 * T2 -> boolean)') :
-    (p.op === 'string=?') ? parseTE('(T1 * T2 -> boolean)') :
-    (p.op === 'display') ? parseTE('(T -> void)') :
-    (p.op === 'newline') ? parseTE('(Empty -> void)') :
-    makeFailure(`Primitive not yet implemented: ${p.op}`);
+    if (p.op === 'number?') return parseTE('(T -> boolean)');
+    if (p.op === 'boolean?') return parseTE('(T -> boolean)');
+    if (p.op === 'string?') return parseTE('(T -> boolean)');
+    if (p.op === 'list?') return parseTE('(T -> boolean)');
+    if (p.op === 'pair?') return parseTE('(T -> boolean)');
+    if (p.op === 'symbol?') return parseTE('(T -> boolean)');
+    if (p.op === 'not') return parseTE('(boolean -> boolean)');
+    if (p.op === 'eq?') return parseTE('(T1 * T2 -> boolean)');
+    if (p.op === 'string=?') return parseTE('(T1 * T2 -> boolean)');
+    if (p.op === 'display') return parseTE('(T -> void)');
+    if (p.op === 'newline') return parseTE('(Empty -> void)');
+    // Added cons car cdr for pairs
+    if (p.op === 'cons') {
+        // creating a pair type with two fresh type variables
+        const t1: TVar = makeFreshTVar();
+        const t2: TVar = makeFreshTVar();
+        // the primitive type is: (t1 * t2 -> (Pair t1 t2))
+        return makeOk(makeProcTExp(
+            [t1, t2],              // params: t1, t2
+            makePairTExp(t1, t2)    // return type: Pair(t1, t2)
+        ));
+    }
+
+    if (p.op === 'car') {
+        // creating two fresh type variables for the pair
+        const t1: TVar = makeFreshTVar();
+        const t2: TVar = makeFreshTVar();
+        // the primitive type is: ( (Pair t1 t2) -> t1 )
+        return makeOk(makeProcTExp(
+            [ makePairTExp(t1, t2) ],  // single parameter: Pair(t1,t2)
+            t1                         // return type: t1
+        ));
+    }
+
+    if (p.op === 'cdr') {
+        // creating two fresh type variables for the pair
+        const t1: TVar = makeFreshTVar();
+        const t2: TVar = makeFreshTVar();
+        // the primitive type is: ( (Pair t1 t2) -> t2 )
+        return makeOk(makeProcTExp(
+            [ makePairTExp(t1, t2) ],  // single parameter: Pair(t1,t2)
+            t2                         // return type: t2
+        ));
+    }
+
+    // If this is an unrecognized primitive, return an error
+    return makeFailure(`Primitive not yet implemented: ${p.op}`);
+};
 
 // Purpose: compute the type of an if-exp
 // Typing rule:

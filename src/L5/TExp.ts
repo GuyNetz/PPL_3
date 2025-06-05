@@ -39,15 +39,15 @@ import { Result, bind, makeOk, makeFailure, mapResult, mapv } from "../shared/re
 import { parse as p } from "../shared/parser";
 import { format } from "../shared/format";
 
-export type TExp =  AtomicTExp | CompoundTExp | TVar;
+export type TExp =  AtomicTExp | CompoundTExp | PairTExp | TVar;
 export const isTExp = (x: any): x is TExp => isAtomicTExp(x) || isCompoundTExp(x) || isTVar(x);
 
 export type AtomicTExp = NumTExp | BoolTExp | StrTExp | VoidTExp;
 export const isAtomicTExp = (x: any): x is AtomicTExp =>
     isNumTExp(x) || isBoolTExp(x) || isStrTExp(x) || isVoidTExp(x);
 
-export type CompoundTExp = ProcTExp | TupleTExp;
-export const isCompoundTExp = (x: any): x is CompoundTExp => isProcTExp(x) || isTupleTExp(x);
+export type CompoundTExp = ProcTExp | TupleTExp | PairTExp;
+export const isCompoundTExp = (x: any): x is CompoundTExp => isProcTExp(x) || isTupleTExp(x) || isPairTExp(x);
 
 export type NonTupleTExp = AtomicTExp | ProcTExp | TVar;
 export const isNonTupleTExp = (x: any): x is NonTupleTExp =>
@@ -91,6 +91,12 @@ export type NonEmptyTupleTExp = { tag: "NonEmptyTupleTExp"; TEs: NonTupleTExp[];
 export const makeNonEmptyTupleTExp = (tes: NonTupleTExp[]): NonEmptyTupleTExp =>
     ({tag: "NonEmptyTupleTExp", TEs: tes});
 export const isNonEmptyTupleTExp = (x: any): x is NonEmptyTupleTExp => x.tag === "NonEmptyTupleTExp";
+
+// Added new pair type with consructor and predicate
+export type PairTExp = { tag: "PairTExp"; left: TExp; right: TExp; };
+export const makePairTExp = (left: TExp, right: TExp): PairTExp =>
+    ({ tag: "PairTExp", left, right });
+export const isPairTExp = (x: any): x is PairTExp => x.tag === "PairTExp";
 
 // TVar: Type Variable with support for dereferencing (TVar -> TVar)
 export type TVar = { tag: "TVar"; var: string; contents: Box<undefined | TExp>; };
@@ -163,15 +169,26 @@ export const parseTExp = (texp: Sexp): Result<TExp> =>
 ;; expected exactly one -> in the list
 ;; We do not accept (a -> b -> c) - must parenthesize
 */
-const parseCompoundTExp = (texps: Sexp[]): Result<ProcTExp> => {
+const parseCompoundTExp = (texps: Sexp[]): Result<TExp> => {
+    // Identifying Pair: (Pair <texp1> <texp2>)
+    if (texps.length === 3 && texps[0] === "Pair") {                            
+        return bind(parseTExp(texps[1]), (leftTE: TExp) =>
+            mapv(parseTExp(texps[2]), (rightTE: TExp) =>
+                makePairTExp(leftTE, rightTE)));                            
+    }
+    
     const pos = texps.indexOf('->');
-    return (pos === -1)  ? makeFailure(`Procedure type expression without -> - ${format(texps)}`) :
-           (pos === 0) ? makeFailure(`No param types in proc texp - ${format(texps)}`) :
-           (pos === texps.length - 1) ? makeFailure(`No return type in proc texp - ${format(texps)}`) :
-           (texps.slice(pos + 1).indexOf('->') > -1) ? makeFailure(`Only one -> allowed in a procexp - ${format(texps)}`) :
-           bind(parseTupleTExp(texps.slice(0, pos)), (args: TExp[]) =>
-               mapv(parseTExp(texps[pos + 1]), (returnTE: TExp) =>
-                    makeProcTExp(args, returnTE)));
+    return (pos === -1)
+        ? makeFailure(`Procedure type expression without '->' and not a Pair: ${format(texps)}`)  
+        : (pos === 0)
+            ? makeFailure(`No param types in proc texp - ${format(texps)}`)
+            : (pos === texps.length - 1)
+                ? makeFailure(`No return type in proc texp - ${format(texps)}`)
+                : ((texps.slice(pos + 1).indexOf('->') > -1)
+                    ? makeFailure(`Only one '->' allowed in a proc-texp: ${format(texps)}`)
+                    : bind(parseTupleTExp(texps.slice(0, pos)), (args: TExp[]) =>
+                         mapv(parseTExp(texps[pos + 1]), (returnTE: TExp) =>
+                             makeProcTExp(args, returnTE))));
 };
 
 /*
@@ -209,6 +226,10 @@ export const unparseTExp = (te: TExp): Result<string> => {
         isVoidTExp(x) ? makeOk('void') :
         isEmptyTVar(x) ? makeOk(x.var) :
         isTVar(x) ? up(tvarContents(x)) :
+        // Added PairTExp handling
+        isPairTExp(x) ? bind(unparseTExp(x.left), (leftStr: string) =>
+                            bind(unparseTExp(x.right), (rightStr: string) =>
+                                makeOk(`(Pair ${leftStr} ${rightStr})`))) :
         isProcTExp(x) ? bind(unparseTuple(x.paramTEs), (paramTEs: string[]) =>
                             mapv(unparseTExp(x.returnTE), (returnTE: string) =>
                                 [...paramTEs, '->', returnTE])) :
@@ -252,17 +273,39 @@ const matchTVarsInTE = <T1, T2>(te1: TExp, te2: TExp,
                                 succ: (mapping: Array<Pair<TVar, TVar>>) => T1,
                                 fail: () => T2): T1 | T2 =>
     (isTVar(te1) || isTVar(te2)) ? matchTVarsinTVars(tvarDeref(te1), tvarDeref(te2), succ, fail) :
+    (isPairTExp(te1) && isPairTExp(te2)) ?
+        // unifying the left part
+        matchTVarsInTE(te1.left, te2.left,
+            // if the lefts unified successfully, return a function that unifies the rights
+            (mappingLeft: Array<Pair<TVar, TVar>>) =>
+                matchTVarsInTE(te1.right, te2.right,
+                    // if the rights also unified, return the union of the mappings
+                    (mappingRight: Array<Pair<TVar, TVar>>) => succ([...mappingLeft, ...mappingRight]),
+                    () => fail()
+                ),
+            () => fail()
+        ) :                            
     (isAtomicTExp(te1) || isAtomicTExp(te2)) ?
         ((isAtomicTExp(te1) && isAtomicTExp(te2) && eqAtomicTExp(te1, te2)) ? succ([]) : fail()) :
     matchTVarsInTProcs(te1, te2, succ, fail);
 
 // te1 and te2 are the result of tvarDeref
 const matchTVarsinTVars = <T1, T2>(te1: TExp, te2: TExp,
-                                    succ: (mapping: Array<Pair<TVar, TVar>>) => T1,
-                                    fail: () => T2): T1 | T2 =>
-    (isTVar(te1) && isTVar(te2)) ? (eqTVar(te1, te2) ? succ([]) : succ([{left: te1, right: te2}])) :
-    (isTVar(te1) || isTVar(te2)) ? fail() :
-    matchTVarsInTE(te1, te2, succ, fail);
+                                  succ: (mapping: Array<Pair<TVar, TVar>>) => T1,
+                                  fail: () => T2): T1 | T2 =>
+    // if both are TVars
+    (isTVar(te1) && isTVar(te2))
+        ? (eqTVar(te1, te2)
+            ? succ([])
+            : succ([{ left: te1, right: te2 }]))
+    // if only te1 is TVar (and te2 is not TVar) - we thread te2 into te1           
+    : (isTVar(te1))
+        ? (tvarSetContents(te1, te2), succ([]))
+    // if only te2 is TVar (and te1 is not TVar) - we thread te1 into te2
+    : (isTVar(te2))
+        ? (tvarSetContents(te2, te1), succ([]))
+    // if both are not TVars (and not PairTExp) - we check if they are equivalent
+    : matchTVarsInTE(te1, te2, succ, fail);
 
 const matchTVarsInTProcs = <T1, T2>(te1: TExp, te2: TExp,
         succ: (mapping: Array<Pair<TVar, TVar>>) => T1,
@@ -270,7 +313,7 @@ const matchTVarsInTProcs = <T1, T2>(te1: TExp, te2: TExp,
     (isProcTExp(te1) && isProcTExp(te2)) ? matchTVarsInTEs(procTExpComponents(te1), procTExpComponents(te2), succ, fail) :
     fail();
 
-const matchTVarsInTEs = <T1, T2>(te1: TExp[], te2: TExp[],
+export const matchTVarsInTEs = <T1, T2>(te1: TExp[], te2: TExp[],
                                     succ: (mapping: Array<Pair<TVar, TVar>>) => T1,
                                     fail: () => T2): T1 | T2 =>
     // Match first then continue on rest
