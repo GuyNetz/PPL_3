@@ -4,15 +4,48 @@ import { equals, map, zipWith } from 'ramda';
 import { isAppExp, isBoolExp, isDefineExp, isIfExp, isLetrecExp, isLetExp, isNumExp,
          isPrimOp, isProcExp, isProgram, isStrExp, isVarRef, parseL5Exp, unparse,
          AppExp, BoolExp, DefineExp, Exp, IfExp, LetrecExp, LetExp, NumExp,
-         Parsed, PrimOp, ProcExp, Program, StrExp, isCExp, parseL5Program, parseL5} from "./L5-ast";
+         Parsed, PrimOp, ProcExp, Program, StrExp, isCExp, parseL5Program, parseL5, isLitExp, LitExp} from "./L5-ast";
+import { isCompoundSExp, isEmptySExp, isSymbolSExp, SExpValue } from "./L5-value";
 import { applyTEnv, makeEmptyTEnv, makeExtendTEnv, TEnv } from "./TEnv";
-import { isProcTExp, makeBoolTExp, makeNumTExp, makeProcTExp, makeStrTExp, makeVoidTExp,
-         parseTE, unparseTExp,
-         BoolTExp, NumTExp, StrTExp, TExp, VoidTExp, TVar, makeFreshTVar, makePairTExp, matchTVarsInTEs } from "./TExp";
+import { isProcTExp, makeBoolTExp, makeNumTExp, makeProcTExp, makeStrTExp, makeVoidTExp, 
+         parseTE, unparseTExp, makeEmptyTupleTExp, makeLiteralTExp, BoolTExp, NumTExp, StrTExp,
+         TExp, VoidTExp, TVar, makeFreshTVar, makePairTExp, matchTVarsInTEs , TExp as L5TExp} from "./TExp";
 import { isEmpty, allT, first, rest, NonEmptyList, List, isNonEmptyList } from '../shared/list';
 import { Result, makeFailure, bind, makeOk, zipWithResult, isFailure } from '../shared/result';
 import { parse as p } from "../shared/parser";
 import { format } from '../shared/format';
+
+// Compute the type of a quoated SExp
+const typeofQuoted = (sv: SExpValue, isTop: boolean): Result<L5TExp> => {
+  // if the SExp is a compound SExp (pair), we need to check its head and tail
+  if (isCompoundSExp(sv)) {
+    const head = sv.val1;
+    const tail = sv.val2;
+    return bind(typeofQuoted(head, false), (hte: L5TExp) =>
+           bind(typeofQuoted(tail, false), (tte: L5TExp) =>
+               makeOk(makePairTExp(hte, tte))));
+  }
+  // if the SExp is empty, we return an empty tuple type
+  if (isEmptySExp(sv)) {
+    return makeOk(makeEmptyTupleTExp());
+  }
+  // if the SExp is a symbol, we return a literal type
+  if (isSymbolSExp(sv)) {
+    return makeOk(makeLiteralTExp());
+  }
+  // if the SExp is a number, boolean, or string
+  if (typeof sv === "number") {
+    return isTop ? makeOk(makeLiteralTExp()) : makeOk(makeNumTExp());
+  }
+  if (typeof sv === "boolean") {
+    return isTop ? makeOk(makeLiteralTExp()) : makeOk(makeBoolTExp());
+  }
+  if (typeof sv === "string") {
+    return isTop ? makeOk(makeLiteralTExp()) : makeOk(makeStrTExp());
+  }
+  // if we didn't catch any case – error
+  return makeFailure(`Unexpected quoted form: ${format(sv)}`);
+};
 
 // Purpose: Check that type expressions are equivalent
 // as part of a fully-annotated type check process of exp.
@@ -50,6 +83,7 @@ export const typeofExp = (exp: Parsed, tenv: TEnv): Result<TExp> =>
     isNumExp(exp) ? makeOk(typeofNum(exp)) :
     isBoolExp(exp) ? makeOk(typeofBool(exp)) :
     isStrExp(exp) ? makeOk(typeofStr(exp)) :
+    isLitExp(exp)    ? bind(typeofQuoted(exp.val, true), te => makeOk(te)) :
     isPrimOp(exp) ? typeofPrim(exp) :
     isVarRef(exp) ? applyTEnv(tenv, exp.var) :
     isIfExp(exp) ? typeofIf(exp, tenv) :

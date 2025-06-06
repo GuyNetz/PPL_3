@@ -13,6 +13,15 @@ import { Result, bind, makeFailure, mapResult, makeOk, mapv } from "../shared/re
 import { isArray, isString, isNumericString, isIdentifier } from "../shared/type-predicates";
 import { format } from "../shared/format";
 
+// Preprocess the input string to replace single quotes with a specific syntax for quotes.
+const preprocessQuotes = (s: string): string => {
+    // Replace '(( with (quote ( to handle nested quotes
+    let r = s.replace(/'\(\(/g, "(quote $1)");
+    // Replace ' with (quote to handle single quotes
+    r = r.replace(/'([^\s()]+)/g, "(quote $1)");
+    return r;
+};
+
 /*
 // =============================================================================
 // Examples of type annotated programs
@@ -176,7 +185,7 @@ const isPrimOpKeyword = (x: string): x is PrimOpKeyword =>
 // Parsing
 
 export const parseL5 = (x: string): Result<Program> =>
-    bind(p(x), parseL5Program);
+    bind(p(preprocessQuotes(x)), parseL5Program);
 
 export const parseL5Program = (sexp: Sexp): Result<Program> =>
     isToken(sexp) ? makeFailure(`Program cannot be a single token: ${format(sexp)}`) :

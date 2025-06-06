@@ -147,35 +147,31 @@ describe("L5 Type Checker", () => {
         });
     });
 
-    // describe("Quote Expression Tests", () => {
+    describe("Quote Expression Tests", () => {
 
-    //     it("should correctly type a quoted pair of numbers", () => {
-    //         assert.deepEqual(getTypeofProgram("(L5 (quote (4 . 7)))"), "(Pair number number)");
-    //     });
-
-
-    //     it("should correctly type a quoted expression with shorthand notation", () => {
-    //         assert.deepEqual(getTypeofProgram("(L5 '(4 . 7))"), "(Pair number number)");
-    //     });
-
-    //     it("should correctly type a quoted literal with shorthand notation", () => {
-    //         assert.deepEqual(getTypeofProgram("(L5 '5)"), "literal");
-    //     });
-
-    //     it("should correctly type a quoted boolean and boolean with shorthand notation", () => {
-    //         assert.deepEqual(getTypeofProgram("(L5 '(#t . #f))"), "(Pair boolean boolean)");
-    //     });
-
-    //     it("should correctly type a quoted boolean adn nmber with shorthand notation", () => {
-    //         assert.deepEqual(getTypeofProgram("(L5 '(#t . 10))"), "(Pair boolean number)");
-    //     });
-
-    //     it("should correctly type a quoted number and literal with shorthand notation", () => {
-    //         assert.deepEqual(getTypeofProgram("(L5 '(4 . abc))"), "(Pair number literal)");
-    //     });
+        it("should correctly type a quoted pair of numbers", () => {
+            assert.deepEqual(getTypeofProgram("(L5 (quote (4 . 7)))"), "(Pair number number)");
+        });
 
 
+        it("should correctly type a quoted expression with shorthand notation", () => {
+            assert.deepEqual(getTypeofProgram("(L5 '(4 . 7))"), "(Pair number number)");
+        });
 
+        it("should correctly type a quoted literal with shorthand notation", () => {
+            assert.deepEqual(getTypeofProgram("(L5 '5)"), "literal");
+        });
 
-    // });
+        it("should correctly type a quoted boolean and boolean with shorthand notation", () => {
+            assert.deepEqual(getTypeofProgram("(L5 '(#t . #f))"), "(Pair boolean boolean)");
+        });
+
+        it("should correctly type a quoted boolean adn nmber with shorthand notation", () => {
+            assert.deepEqual(getTypeofProgram("(L5 '(#t . 10))"), "(Pair boolean number)");
+        });
+
+        it("should correctly type a quoted number and literal with shorthand notation", () => {
+            assert.deepEqual(getTypeofProgram("(L5 '(4 . abc))"), "(Pair number literal)");
+        });
+    });
 });

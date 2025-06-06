@@ -39,8 +39,8 @@ import { Result, bind, makeOk, makeFailure, mapResult, mapv } from "../shared/re
 import { parse as p } from "../shared/parser";
 import { format } from "../shared/format";
 
-export type TExp =  AtomicTExp | CompoundTExp | PairTExp | TVar;
-export const isTExp = (x: any): x is TExp => isAtomicTExp(x) || isCompoundTExp(x) || isTVar(x);
+export type TExp =  AtomicTExp | CompoundTExp | PairTExp | TVar | LiteralTExp;
+export const isTExp = (x: any): x is TExp => isAtomicTExp(x) || isCompoundTExp(x) || isTVar(x) || isLiteralTExp(x);
 
 export type AtomicTExp = NumTExp | BoolTExp | StrTExp | VoidTExp;
 export const isAtomicTExp = (x: any): x is AtomicTExp =>
@@ -97,6 +97,11 @@ export type PairTExp = { tag: "PairTExp"; left: TExp; right: TExp; };
 export const makePairTExp = (left: TExp, right: TExp): PairTExp =>
     ({ tag: "PairTExp", left, right });
 export const isPairTExp = (x: any): x is PairTExp => x.tag === "PairTExp";
+
+// Added new LiteralTExp type with constructor and predicate
+export type LiteralTExp = { tag: "LiteralTExp" };
+export const makeLiteralTExp = (): LiteralTExp => ({ tag: "LiteralTExp" });
+export const isLiteralTExp = (x: any): x is LiteralTExp => x.tag === "LiteralTExp";
 
 // TVar: Type Variable with support for dereferencing (TVar -> TVar)
 export type TVar = { tag: "TVar"; var: string; contents: Box<undefined | TExp>; };
@@ -224,6 +229,7 @@ export const unparseTExp = (te: TExp): Result<string> => {
         isBoolTExp(x) ? makeOk('boolean') :
         isStrTExp(x) ? makeOk('string') :
         isVoidTExp(x) ? makeOk('void') :
+        isLiteralTExp(x) ? makeOk('literal') :
         isEmptyTVar(x) ? makeOk(x.var) :
         isTVar(x) ? up(tvarContents(x)) :
         // Added PairTExp handling
